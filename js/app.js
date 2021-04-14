@@ -8,38 +8,11 @@ const timeFormatter = new Intl.DateTimeFormat(undefined, {
 	minute: "2-digit",
 })
 
-let tweets = [
-	{
-		id: 1618235474432,
-		timestamp: 1618235474432,
-		text: "1",
-		liked: false,
-	},
-	{
-		id: 1618235478198,
-		timestamp: 1618235478198,
-		text: "2",
-		liked: true,
-	},
-	{
-		id: 1618235485033,
-		timestamp: 1618235485033,
-		text: "3",
-		liked: false,
-	},
-	{
-		id: 1618235488868,
-		timestamp: 1618235488868,
-		text: "4",
-		liked: true,
-	},
-	{
-		id: 1618235491402,
-		timestamp: 1618235491402,
-		text: "5",
-		liked: true,
-	},
-]
+if (!localStorage.getItem("tweets")) {
+	localStorage.setItem("tweets", JSON.stringify([]))
+}
+
+let tweets = JSON.parse(localStorage.getItem("tweets"))
 
 renderTweets(tweets, "tweet-list")
 
@@ -53,6 +26,8 @@ window.addEventListener("popstate", () => {
 		renderTweets(likedTweets, "tweet-list-liked")
 	}
 })
+
+function filterLikedTweet() {}
 
 document.addEventListener("submit", event => {
 	event.preventDefault()
@@ -70,6 +45,7 @@ document.addEventListener("submit", event => {
 			liked: false,
 		}
 		tweets.push(newTweet)
+		localStorage.setItem("tweets", JSON.stringify(tweets))
 	}
 	if (pageHash === "edit") {
 	}
@@ -80,21 +56,32 @@ document.addEventListener("submit", event => {
 document.addEventListener("reset", () => {
 	routePush("")
 })
-//?--------------------Like/unlike start-----------------------//
+//?--------------------Buttons action start-----------------------//
 appEl.addEventListener("click", event => {
+	//*------- Like/unlike start -------//
 	const likeBtnEl = event.target.closest(".btn-like")
+	let tweetId = null
 	if (likeBtnEl) {
-		const tweetId = likeBtnEl.closest(".tweet").dataset.id
+		tweetId = likeBtnEl.closest(".tweet").dataset.id
 		tweets.forEach(tweet => {
 			if (tweet["id"] == tweetId) {
 				tweet.liked = !tweet.liked
-				console.log(tweet.liked)
-				renderTweets(tweets, "tweet-list")
 			}
 		})
 	}
+	//*------- Like/unlike end -------//
+	//*------- Delete tweet start -------//
+	const deleteBtn = event.target.closest(".btn-delete")
+	if (deleteBtn) {
+		tweetId = deleteBtn.closest(".tweet").dataset.id
+		const indexTweet = tweets.findIndex(tweet => tweet["id"] == tweetId)
+		tweets.splice(indexTweet, 1)
+	}
+	//*------- Delete tweet end -------//
+	localStorage.setItem("tweets", JSON.stringify(tweets))
+	renderTweets(tweets, "tweet-list")
 })
-//?--------------------Like/unlike end-----------------------//
+//?--------------------Buttons action end-----------------------//
 function renderTweets(tweetsArr, addClass) {
 	const tweetListEl = appEl.querySelector(`.${addClass}`)
 	tweetListEl.innerHTML = ""
@@ -111,12 +98,12 @@ function createTweetHtml(tweetObj) {
 		tweetObj.id
 	}">
         <p class="tweet-text w-75 m-0">${tweetObj.text}</p>
-        <div class="tweet-actions w-25 d-flex align-items-center justify-content-end">
-            <button data-action="like" class="btn btn-like btn-sm btn-primary mx-1">${
-							tweetObj.liked ? "Like" : "Unlike"
-						}</button>
+        <div class="tweet-actions w-25 d-flex align-items-center justify-content-end h-100">
+            <button data-action="like" class="btn btn-like btn-sm mx-1 ${
+							tweetObj.liked ? "btn-outline-primary" : "btn-primary"
+						}">${tweetObj.liked ? "Unlike" : "Like"}</button>
             <button data-action="edit" class="btn btn-sm btn-secondary mx-1">Edit</button>
-            <button data-action="remove" class="btn btn-sm btn-danger mx-1">Remove</button>
+            <button data-action="remove" class="btn btn-delete btn-sm btn-danger mx-1">Remove</button>
         </div>
         <small class="text-muted">${dateFormatter.format(
 					tweetObj.timestamp
