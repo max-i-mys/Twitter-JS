@@ -1,5 +1,9 @@
 let pageHash = window.location.hash.slice(1)
 const appEl = document.getElementById("app")
+//------
+const mainPageEl = document.getElementById("mainPage")
+const likedPageEl = document.getElementById("likedPage")
+//------
 const pagesEls = Array.from(appEl.children)
 switchPage(pageHash)
 const dateFormatter = new Intl.DateTimeFormat()
@@ -14,16 +18,15 @@ if (!localStorage.getItem("tweets")) {
 
 let tweets = JSON.parse(localStorage.getItem("tweets"))
 
-renderTweets(tweets, "tweet-list")
+renderTweets(tweets, mainPageEl)
 
 window.addEventListener("popstate", () => {
-	console.log("POPSTATE")
+	// console.log("POPSTATE")
 	pageHash = window.location.hash.slice(1)
 	switchPage(pageHash)
 	if (pageHash === "liked") {
 		const likedTweets = tweets.filter(likedTweet => likedTweet.liked == true)
-		console.log(likedTweets)
-		renderTweets(likedTweets, "tweet-list-liked")
+		renderTweets(likedTweets, likedPageEl)
 	}
 })
 
@@ -50,7 +53,7 @@ document.addEventListener("submit", event => {
 	if (pageHash === "edit") {
 	}
 	form.reset()
-	renderTweets(tweets, "tweet-list")
+	renderTweets(tweets, mainPageEl)
 })
 
 document.addEventListener("reset", () => {
@@ -78,12 +81,17 @@ appEl.addEventListener("click", event => {
 		tweets.splice(indexTweet, 1)
 	}
 	//*------- Delete tweet end -------//
+
+	if (pageHash === "liked") {
+		const likedTweets = tweets.filter(likedTweet => likedTweet.liked == true)
+		renderTweets(likedTweets, likedPageEl)
+	}
+	renderTweets(tweets, mainPageEl)
 	localStorage.setItem("tweets", JSON.stringify(tweets))
-	renderTweets(tweets, "tweet-list")
 })
 //?--------------------Buttons action end-----------------------//
-function renderTweets(tweetsArr, addClass) {
-	const tweetListEl = appEl.querySelector(`.${addClass}`)
+function renderTweets(tweetsArr, typePage) {
+	const tweetListEl = typePage.querySelector(`.tweet-list`)
 	tweetListEl.innerHTML = ""
 	for (let i = 0; i < tweetsArr.length; i++) {
 		tweetListEl.insertAdjacentHTML("afterbegin", createTweetHtml(tweetsArr[i]))
