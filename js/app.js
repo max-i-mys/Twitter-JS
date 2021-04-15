@@ -5,7 +5,7 @@ const mainPageEl = document.getElementById("mainPage")
 const likedPageEl = document.getElementById("likedPage")
 //------
 const pagesEls = Array.from(appEl.children)
-switchPage(pageHash)
+
 const dateFormatter = new Intl.DateTimeFormat()
 const timeFormatter = new Intl.DateTimeFormat(undefined, {
 	hour: "2-digit",
@@ -17,20 +17,19 @@ if (!localStorage.getItem("tweets")) {
 }
 
 let tweets = JSON.parse(localStorage.getItem("tweets"))
+let currentPageEl = null
+switchPage(pageHash)
 
-renderTweets(tweets, mainPageEl)
-
+window.addEventListener("storage", () => {
+	console.log("storage!")
+	tweets = JSON.parse(localStorage.getItem("tweets"))
+	renderTweets(tweets, currentPageEl)
+})
 window.addEventListener("popstate", () => {
 	// console.log("POPSTATE")
 	pageHash = window.location.hash.slice(1)
 	switchPage(pageHash)
-	if (pageHash === "liked") {
-		const likedTweets = tweets.filter(likedTweet => likedTweet.liked == true)
-		renderTweets(likedTweets, likedPageEl)
-	}
 })
-
-function filterLikedTweet() {}
 
 document.addEventListener("submit", event => {
 	event.preventDefault()
@@ -47,13 +46,16 @@ document.addEventListener("submit", event => {
 			text,
 			liked: false,
 		}
+
 		tweets.push(newTweet)
-		localStorage.setItem("tweets", JSON.stringify(tweets))
 	}
-	if (pageHash === "edit") {
+	if (pageHash.startsWith("edit")) {
+		const tweetId = +pageHash.split("/")[1]
+		const tweet = tweets.find(tweet => tweet.id === tweetId)
+		tweet.text = text
 	}
+	localStorage.setItem("tweets", JSON.stringify(tweets))
 	form.reset()
-	renderTweets(tweets, mainPageEl)
 })
 
 document.addEventListener("reset", () => {
@@ -61,40 +63,42 @@ document.addEventListener("reset", () => {
 })
 //?--------------------Buttons action start-----------------------//
 appEl.addEventListener("click", event => {
-	//*------- Like/unlike start -------//
-	const likeBtnEl = event.target.closest(".btn-like")
-	let tweetId = null
-	if (likeBtnEl) {
-		tweetId = likeBtnEl.closest(".tweet").dataset.id
-		tweets.forEach(tweet => {
-			if (tweet["id"] == tweetId) {
+	const actionBtnEl = event.target.closest(".tweet-action-btn")
+	if (actionBtnEl) {
+		const tweetId = +actionBtnEl.closest(".tweet").dataset.id
+		const tweetIdx = tweets.findIndex(tweet => tweet.id === tweetId)
+		const actionType = actionBtnEl.dataset.action
+		const tweet = tweets[tweetIdx]
+		switch (actionType) {
+			case "like":
 				tweet.liked = !tweet.liked
-			}
-		})
+				break
+			case "edit":
+				routePush(`edit/${tweetId}`)
+				break
+			case "remove":
+				tweets.splice(tweetIdx, 1)
+				break
+		}
+		renderTweets(tweets, currentPageEl)
+		localStorage.setItem("tweets", JSON.stringify(tweets))
 	}
-	//*------- Like/unlike end -------//
-	//*------- Delete tweet start -------//
-	const deleteBtn = event.target.closest(".btn-delete")
-	if (deleteBtn) {
-		tweetId = deleteBtn.closest(".tweet").dataset.id
-		const indexTweet = tweets.findIndex(tweet => tweet["id"] == tweetId)
-		tweets.splice(indexTweet, 1)
-	}
-	//*------- Delete tweet end -------//
-
-	if (pageHash === "liked") {
-		const likedTweets = tweets.filter(likedTweet => likedTweet.liked == true)
-		renderTweets(likedTweets, likedPageEl)
-	}
-	renderTweets(tweets, mainPageEl)
-	localStorage.setItem("tweets", JSON.stringify(tweets))
 })
 //?--------------------Buttons action end-----------------------//
-function renderTweets(tweetsArr, typePage) {
-	const tweetListEl = typePage.querySelector(`.tweet-list`)
-	tweetListEl.innerHTML = ""
-	for (let i = 0; i < tweetsArr.length; i++) {
-		tweetListEl.insertAdjacentHTML("afterbegin", createTweetHtml(tweetsArr[i]))
+function renderTweets(tweetsArr, currentPage) {
+	const tweetListEl = currentPage.querySelector(`.tweet-list`)
+	if (tweetListEl) {
+		tweetsArr.sort((a, b) => (a.timestamp - b.timestamp) * -1)
+		let renderArray = []
+		if (pageHash === "liked") {
+			renderArray = tweetsArr.filter(tweet => tweet.liked)
+		} else {
+			renderArray = tweetsArr
+		}
+		let tweetsHtml = ""
+		renderArray.forEach(tweet => (tweetsHtml += createTweetHtml(tweet)))
+		tweetListEl.innerHTML = tweetsHtml
+		console.log(tweetsArr)
 	}
 }
 
@@ -107,11 +111,11 @@ function createTweetHtml(tweetObj) {
 	}">
         <p class="tweet-text w-75 m-0">${tweetObj.text}</p>
         <div class="tweet-actions w-25 d-flex align-items-center justify-content-end h-100">
-            <button data-action="like" class="btn btn-like btn-sm mx-1 ${
+            <button data-action="like" class="btn tweet-action-btn btn-sm mx-1 ${
 							tweetObj.liked ? "btn-outline-primary" : "btn-primary"
 						}">${tweetObj.liked ? "Unlike" : "Like"}</button>
-            <button data-action="edit" class="btn btn-sm btn-secondary mx-1">Edit</button>
-            <button data-action="remove" class="btn btn-delete btn-sm btn-danger mx-1">Remove</button>
+            <button data-action="edit" class="btn tweet-action-btn btn-sm btn-secondary mx-1">Edit</button>
+            <button data-action="remove" class="btn tweet-action-btn btn-sm btn-danger mx-1">Remove</button>
         </div>
         <small class="text-muted">${dateFormatter.format(
 					tweetObj.timestamp
@@ -127,10 +131,29 @@ function routePush(route) {
 }
 
 function switchPage(hash) {
-	let route = hash || "main"
-	route += "Page"
+	let route = hash
+	if (route === "") {
+		route = "main"
+	} else if (route.startsWith("edit")) {
+		route = "edit"
+	}
 	pagesEls.forEach(page => {
-		const match = page.id === route
+		const match = page.id === `${route}Page`
+		if (match) {
+			currentPageEl = page
+		}
 		page.classList.toggle("hidden", !match)
 	})
+	renderTweets(tweets, currentPageEl)
+	if (route === "edit") {
+		const tweetId = +pageHash.split("/")[1]
+		if (isNaN(tweetId)) {
+			routePush("")
+			return
+		}
+		const tweet = tweets.find(tweet => tweet.id === tweetId)
+		const tweetText = tweet.text
+		const textArea = currentPageEl.querySelector("textarea")
+		textArea.value = tweetText
+	}
 }
